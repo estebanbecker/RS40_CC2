@@ -15,16 +15,24 @@ from ecdsa import SigningKey, NIST384p
 import hashlib
 class Block:
     
-    def __init__(self, previous_block_hash, transaction_list, private_key=None):
+    def __init__(self, previous_block_hash, transaction_list, signatures = [None], public_keys = [None]):
 
         self.previous_block_hash = previous_block_hash
         self.transaction_list = transaction_list
 
-        #Si un clé est annoncé dans le block, on signe la transaction (on admet qu'il n'y a qu'une transaction par block)
-        if(private_key == None):
-            self.signature = None
-        else:
-            self.signature = private_key.sign(self.transaction_list[0].encode()).hex()
+        #Si une signature est donnée, on l'ajoute au block, sinon on met None
+        for(i, signature) in enumerate(signatures):
+            if(signature == None):
+                self.signature = None
+            else:
+                try:
+                    #On vérifie la signature avec la clé publique
+                    public_keys[i].verify(bytes.fromhex(signature), transaction_list[i].encode())
+                    self.signature = signature
+                except:
+                    print("Signature invalide !!!")
+                    self.signature = None
+                    raise Exception("Signature invalide !!!")
 
         #Génération de la preuve de travail, on créé la variabloe poof of work et on l'incrémente jusqu'à ce que le hash du block commence par 0
         self.proof_of_work = -1
@@ -36,8 +44,7 @@ class Block:
             if self.block_hash.startswith('000'):
                 break
             
-            
-        
+             
 
     def check_signature(self, public_key):
         if(self.signature == None):
@@ -64,9 +71,9 @@ class Blockchain:
         self.chain.append(Block(previous_block_hash, transaction_list))
 
     #Fonction d'ajout de block avec signature
-    def create_block_from_transaction_and_private_key(self, transaction_list, private_key):
+    def create_block_from_transaction_and_private_key(self, transaction_list, signatures, public_keys):
         previous_block_hash = self.last_block.block_hash
-        self.chain.append(Block(previous_block_hash, transaction_list, private_key))
+        self.chain.append(Block(previous_block_hash, transaction_list, signatures, public_keys))
 
 
     def display_chain(self):
@@ -94,6 +101,10 @@ class Blockchain:
     def last_block(self):
         return self.chain[-1]
 
+def sign_transaction(transaction, private_key):
+    signature = private_key.sign(transaction.encode()).hex()
+    return signature
+
 
 t1 = "L'employeur me verse 2000 €"
 t2 = "J'ai dépensé 70 € chez Total"
@@ -104,30 +115,30 @@ t6 = "J'ai dépensé 30 € chez SFR"
 
 #Génération de la clé privée
 
-private_key = SigningKey.generate(curve=NIST384p)
-public_key = private_key.get_verifying_key()
+my_private_key = SigningKey.generate(curve=NIST384p)
+my_public_key = my_private_key.get_verifying_key()
 
 myblockchain = Blockchain()
 myblockchain.create_block_from_transaction([t1])
 print("Block1 created\n")
 
 #On midifie les transactions pour utiliser la signature
-myblockchain.create_block_from_transaction_and_private_key([t2], private_key)
+myblockchain.create_block_from_transaction_and_private_key([t2], [sign_transaction(t2, my_private_key)], [my_public_key])
 print("Block2 created\n")
-myblockchain.create_block_from_transaction_and_private_key([t3], private_key)
+myblockchain.create_block_from_transaction_and_private_key([t3], [sign_transaction(t3, my_private_key)], [my_public_key])
 print("Block3 created\n")
-myblockchain.create_block_from_transaction_and_private_key([t4], private_key)
+myblockchain.create_block_from_transaction_and_private_key([t4], [sign_transaction(t4, my_private_key)], [my_public_key])
 print("Block4 created\n")
-myblockchain.create_block_from_transaction_and_private_key([t5], private_key)
+myblockchain.create_block_from_transaction_and_private_key([t5], [sign_transaction(t5, my_private_key)], [my_public_key])
 print("Block5 created\n")
-myblockchain.create_block_from_transaction_and_private_key([t6], private_key)
+myblockchain.create_block_from_transaction_and_private_key([t6], [sign_transaction(t6, my_private_key)], [my_public_key])
 print("Block6 created\n")
 
 myblockchain.display_chain()
 
 
 #Verification de la blockchain
-public_keys = [public_key, public_key, public_key, public_key, public_key, public_key, public_key]
+public_keys = [my_public_key, my_public_key, my_public_key, my_public_key, my_public_key, my_public_key, my_public_key]
 
 if(myblockchain.check_blockchain(public_keys)):
     print("La blockchain est valide")
@@ -148,19 +159,38 @@ if(True):
         print("La blockchain n'est pas valide")
 
     #Création d'une nouvelle blockchain avec une transaction sans la bonne clé
+    print("\nCréation d'une nouvelle blockchain avec une transaction sans la bonne clé\n")
     myblockchain2 = Blockchain()
     false_private_key = SigningKey.generate(curve=NIST384p)
     myblockchain2.create_block_from_transaction([t1])
-    myblockchain2.create_block_from_transaction_and_private_key([t2], private_key)
-    myblockchain2.create_block_from_transaction_and_private_key([t3], private_key)
-    myblockchain2.create_block_from_transaction_and_private_key([t4], false_private_key)
-    myblockchain2.create_block_from_transaction_and_private_key([t5], private_key)
-    myblockchain2.create_block_from_transaction_and_private_key([t6], private_key)
 
-    print("\nCréation d'une nouvelle blockchain avec une transaction sans la bonne clé\n")
+    #On essaye de créer un block avec une transaction signé avec une mauvaise clé
+    #Si la blockchain est valide, le block sera refusé
+    try:   
+        myblockchain2.create_block_from_transaction_and_private_key([t2], [sign_transaction(t2, my_private_key)], [my_public_key])
+    except:
+        print("Erreur lors de la création du block 2 block refusé")
+    try:
+        myblockchain2.create_block_from_transaction_and_private_key([t3], [sign_transaction(t3, my_private_key)], [my_public_key])
+    except:
+        print("Erreur lors de la création du block 3 block refusé")
+    try:
+        myblockchain2.create_block_from_transaction_and_private_key([t4], [sign_transaction(t4, false_private_key)], [my_public_key])
+    except:
+        print("ERREUR lors de la création du block 4, block refusé")
+    try:
+        myblockchain2.create_block_from_transaction_and_private_key([t5], [sign_transaction(t5, my_private_key)], [my_public_key])
+    except:
+        print("Erreur lors de la création du block 5 block refusé")
+    try:
+        myblockchain2.create_block_from_transaction_and_private_key([t6], [sign_transaction(t6, my_private_key)], [my_public_key])
+    except:
+        print("Erreur lors de la création du block 6 block refusé")
 
     if(myblockchain2.check_blockchain(public_keys)):
         print("La blockchain est valide")
     else:
         print("La blockchain n'est pas valide")
+
+    myblockchain2.display_chain()
 
