@@ -4,7 +4,7 @@
 # De plus, si une modification est effectué à un endroit, il faudra modifier
 # toutes les transactions suivantes, ce qui est très compliqué.
 # En plus, il y a un controle de cohérence des transactions (solde nécessaire, signature de la transaction)
-# Réponse 2: Il y a le hash du précédent block. La liste des transactions du block et le hash du block suivant.
+# Réponse 2: Il y a le hash du précédent block. La liste des transactions du block et le hash du block actuel.
 # Réponse 3: Il manque dans le block la signature et la preuve de travail.
 # Réponse 5: Je peux totalement modifier la somme que me verse l'employeur et ainsi avoir plus d'argent que prévu.
 # Réponse 6: Plus il ya  a de 0, plus la preuve de travail est compliqué. Avec six 0, celà fonctionne encore bien, à partir de sept 0
